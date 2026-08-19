@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { GameType, ManagementMode, ManagementConfig, RiskProfile, Bankroll } from '../types';
 import { Calculator, TrendingUp, ShieldAlert, Target, Info, Sparkles, BookOpen, X, CheckCircle, AlertTriangle, RotateCcw, Plus, Minus } from 'lucide-react';
-import { calculateRecoveryBet, generateFibonacciSequence, getOptimalChipSize, calculateStopLossForLossSequence } from '../engines/progressionEngine';
+import { calculateRecoveryBet, generateFibonacciSequence, generatePadovanSequence, getOptimalChipSize, calculateStopLossForLossSequence } from '../engines/progressionEngine';
 
 interface ManagementPanelProps {
   config: ManagementConfig;
@@ -424,14 +424,18 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({ config, bankro
     let currentBetInUnits = initialBetInUnits;
     let totalInvestedUnits = 0;
 
+    const fibSequence = generateFibonacciSequence(Math.max(30, levelsCount + 5));
+    const padovanSequence = generatePadovanSequence(Math.max(30, levelsCount + 5));
+    const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+    const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+
     for (let i = 1; i <= levelsCount + 1; i++) {
         let defaultLevelUnitChip = 1.0;
 
         if (config.mode === ManagementMode.MARTINGALE) {
           defaultLevelUnitChip = Math.pow(multiplier, i - 1);
         } else if (config.mode === ManagementMode.FIBONACCI) {
-          const sequence = generateFibonacciSequence(Math.max(16, levelsCount + 2));
-          defaultLevelUnitChip = sequence[i - 1] || sequence[sequence.length - 1];
+          defaultLevelUnitChip = fibSequence[i - 1] || fibSequence[fibSequence.length - 1];
         } else if (config.mode === ManagementMode.FIXED) {
           defaultLevelUnitChip = 1.0;
         } else if (config.mode === ManagementMode.CYCLIC) {
@@ -445,9 +449,15 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({ config, bankro
           defaultLevelUnitChip = i;
         } else if (config.mode === ManagementMode.NIVEL_FIXO_RECUPERACAO) {
           defaultLevelUnitChip = i;
+        } else if (config.mode === ManagementMode.STAR_2_2) {
+          defaultLevelUnitChip = (i - 1) < star22Seq.length ? star22Seq[i - 1] : star22Seq[star22Seq.length - 1];
         } else if (config.mode === ManagementMode.STAR_2_0) {
-          const sequence = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12];
-          defaultLevelUnitChip = sequence[(i - 1) % sequence.length] || 1;
+          defaultLevelUnitChip = (i - 1) < star20Seq.length ? star20Seq[i - 1] : star20Seq[star20Seq.length - 1];
+        } else if (config.mode === ManagementMode.DUTCH) {
+          const dutchIdx = Math.floor((i - 1) / 3);
+          defaultLevelUnitChip = 1 + dutchIdx * 2;
+        } else if (config.mode === ManagementMode.PADOVAN) {
+          defaultLevelUnitChip = (i - 1) < padovanSequence.length ? padovanSequence[i - 1] : padovanSequence[padovanSequence.length - 1];
         } else {
           defaultLevelUnitChip = Number((currentBetInUnits / N).toFixed(1));
         }
@@ -491,20 +501,16 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({ config, bankro
         if (config.mode === ManagementMode.MARTINGALE) {
           currentBetInUnits = initialBetInUnits * Math.pow(multiplier, i);
         } else if (config.mode === ManagementMode.FIBONACCI) {
-          const sequence = generateFibonacciSequence(Math.max(16, levelsCount + 2));
-          currentBetInUnits = initialBetInUnits * (sequence[i] || sequence[sequence.length - 1]);
+          currentBetInUnits = initialBetInUnits * (fibSequence[i] || fibSequence[fibSequence.length - 1]);
         } else if (config.mode === ManagementMode.STAR_2_2) {
-          const sequence = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12];
-          currentBetInUnits = initialBetInUnits * (sequence[i % sequence.length] || 1);
+          currentBetInUnits = initialBetInUnits * (i < star22Seq.length ? star22Seq[i] : star22Seq[star22Seq.length - 1]);
         } else if (config.mode === ManagementMode.STAR_2_0) {
-          const sequence = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12];
-          currentBetInUnits = initialBetInUnits * (sequence[i % sequence.length] || 1);
+          currentBetInUnits = initialBetInUnits * (i < star20Seq.length ? star20Seq[i] : star20Seq[star20Seq.length - 1]);
         } else if (config.mode === ManagementMode.DUTCH) {
-          const sequence = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
-          currentBetInUnits = initialBetInUnits * (sequence[Math.floor(i / 3) % sequence.length] || 1);
+          const dutchIdx = Math.floor(i / 3);
+          currentBetInUnits = initialBetInUnits * (1 + dutchIdx * 2);
         } else if (config.mode === ManagementMode.PADOVAN) {
-          const sequence = [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49];
-          currentBetInUnits = initialBetInUnits * (sequence[i % sequence.length] || 1);
+          currentBetInUnits = initialBetInUnits * (i < padovanSequence.length ? padovanSequence[i] : padovanSequence[padovanSequence.length - 1]);
         } else {
           currentBetInUnits = initialBetInUnits * (i + 1);
         }

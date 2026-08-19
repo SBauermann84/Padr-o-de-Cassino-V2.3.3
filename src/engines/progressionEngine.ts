@@ -37,6 +37,14 @@ export const generateFibonacciSequence = (length: number): number[] => {
   return seq;
 };
 
+export const generatePadovanSequence = (length: number): number[] => {
+  const seq = [1, 1, 1];
+  for (let i = 3; i < length; i++) {
+    seq.push(seq[i - 2] + seq[i - 3]);
+  }
+  return seq;
+};
+
 export interface ProgressionState {
   currentBetSize: number;
   consecutiveWins: number;
@@ -104,9 +112,12 @@ export const calculateCumulativeGaleLoss = (
     N = 24; // Default to 24 numbers for roulette coverage
   }
 
-  const levelsCount = config.levels !== undefined ? Number(config.levels) : 1;
+  const levelsCount = config.levels !== undefined && !isNaN(Number(config.levels)) && Number(config.levels) >= 0 ? Number(config.levels) : 10;
   const multiplier = config.multiplier || 2;
-  const fibSequence = generateFibonacciSequence(Math.max(16, levelsCount + 2));
+  const fibSequence = generateFibonacciSequence(Math.max(30, levelsCount + 5));
+  const padovanSequence = generatePadovanSequence(Math.max(30, levelsCount + 5));
+  const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+  const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
 
   let totalInvested = 0;
   let labList = [1, 2, 3];
@@ -149,23 +160,20 @@ export const calculateCumulativeGaleLoss = (
           units = 1 + 2 * i;
           break;
         case ManagementMode.STAR_2_2: {
-          const seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12];
-          units = i < seq.length ? seq[i] : seq[seq.length - 1];
+          units = i < star22Seq.length ? star22Seq[i] : star22Seq[star22Seq.length - 1];
           break;
         }
         case ManagementMode.STAR_2_0: {
-          const seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12];
-          units = i < seq.length ? seq[i] : seq[seq.length - 1];
+          units = i < star20Seq.length ? star20Seq[i] : star20Seq[star20Seq.length - 1];
           break;
         }
         case ManagementMode.DUTCH: {
-          const seq = [1, 1, 1, 3, 3, 3, 5, 5, 5, 7, 7, 7, 9, 9, 9, 11, 11, 11, 13, 13, 13];
-          units = i < seq.length ? seq[i] : seq[seq.length - 1];
+          const dutchIdx = Math.floor(i / 3);
+          units = 1 + dutchIdx * 2;
           break;
         }
         case ManagementMode.PADOVAN: {
-          const seq = [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49];
-          units = i < seq.length ? seq[i] : seq[seq.length - 1];
+          units = i < padovanSequence.length ? padovanSequence[i] : padovanSequence[padovanSequence.length - 1];
           break;
         }
         case ManagementMode.LABOUCHERE: {
@@ -302,8 +310,11 @@ export const updateProgressionState = (
         config.minChip
       );
   let initialBet = Number((initialChip * N).toFixed(2));
-  const levelsCount = Number(config.levels) || 3;
-  const fibSequence = generateFibonacciSequence(Math.max(16, levelsCount + 2));
+  const levelsCount = config.levels !== undefined && !isNaN(Number(config.levels)) && Number(config.levels) >= 0 ? Number(config.levels) : 10;
+  const fibSequence = generateFibonacciSequence(Math.max(30, levelsCount + 5));
+  const padovanSequence = generatePadovanSequence(Math.max(30, levelsCount + 5));
+  const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+  const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
 
   let currentBet = state.currentBetSize;
   let consecutiveWins = state.consecutiveWins;
@@ -466,11 +477,11 @@ export const updateProgressionState = (
     else if (config.mode === ManagementMode.CYCLIC) {
       const cycle = [1, 2, 4, 8, 16];
       if (win === false) {
-        if (currentLevel > levelsCount || currentLevel >= cycle.length) {
+        if (currentLevel > levelsCount) {
           currentLevel = 0;
           currentBet = initialBet;
         } else {
-          currentBet = sequenceBaseBet * cycle[currentLevel];
+          currentBet = sequenceBaseBet * (cycle[currentLevel % cycle.length] || 1);
         }
       } else {
         currentLevel = 0;
@@ -620,32 +631,30 @@ export const updateProgressionState = (
       consecutiveWins = 0;
     }
     else if (config.mode === ManagementMode.STAR_2_2) {
-      const seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12];
       if (win === false) {
         consecutiveWins = 0;
         currentLevel += 1;
-        if (currentLevel >= seq.length || currentLevel > levelsCount) {
+        if (currentLevel > levelsCount) {
           currentLevel = 0;
-          currentBet = sequenceBaseBet * seq[0];
+          currentBet = sequenceBaseBet * star22Seq[0];
           cycleLoss = 0;
         } else {
-          currentBet = sequenceBaseBet * seq[currentLevel];
+          currentBet = sequenceBaseBet * (star22Seq[currentLevel] || star22Seq[star22Seq.length - 1]);
         }
       } else {
         if (consecutiveWins === 0) {
           consecutiveWins = 1;
-          const seqVal = seq[Math.min(currentLevel, seq.length - 1)] || 1;
+          const seqVal = star22Seq[Math.min(currentLevel, star22Seq.length - 1)] || 1;
           currentBet = sequenceBaseBet * Math.max(1, Math.round(seqVal * 1.5));
         } else {
           consecutiveWins = 0;
           currentLevel = 0;
-          currentBet = sequenceBaseBet * seq[0];
+          currentBet = sequenceBaseBet * star22Seq[0];
           cycleLoss = 0;
         }
       }
     }
     else if (config.mode === ManagementMode.STAR_2_0) {
-      const seq = [1, 2, 3, 4, 5, 7, 9, 12];
       const U = sequenceBaseBet;
       
       const prevLevel = state.currentLevel;
@@ -657,7 +666,7 @@ export const updateProgressionState = (
           consecutiveWins = 0;
           if (cycleLoss >= 7 * U) {
             currentLevel = 1;
-            currentBet = U * seq[0];
+            currentBet = U * (star20Seq[0] || 1);
           } else {
             currentLevel = 0;
             currentBet = U;
@@ -679,18 +688,18 @@ export const updateProgressionState = (
         if (win === false) {
           consecutiveWins = 0;
           currentLevel = prevLevel + 1;
-          if (currentLevel > seq.length || currentLevel > levelsCount) {
+          if (currentLevel > levelsCount) {
             currentLevel = 0;
             currentBet = U;
             cycleLoss = 0;
           } else {
-            currentBet = U * seq[currentLevel - 1];
+            currentBet = U * (star20Seq[currentLevel - 1] || star20Seq[star20Seq.length - 1]);
           }
         } else {
           if (prevConsecutiveWins === 0) {
             consecutiveWins = 1;
             currentLevel = prevLevel;
-            const seqVal = seq[Math.min(prevLevel - 1, seq.length - 1)] || 1;
+            const seqVal = star20Seq[Math.min(prevLevel - 1, star20Seq.length - 1)] || 1;
             currentBet = U * seqVal * 2;
           } else {
             consecutiveWins = 0;
@@ -702,39 +711,41 @@ export const updateProgressionState = (
       }
     }
     else if (config.mode === ManagementMode.DUTCH) {
-      const seq = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
       if (win === false) {
         currentLevel += 1;
         const levelIdx = Math.floor(currentLevel / 3);
-        if (levelIdx >= seq.length || levelIdx > levelsCount) {
+        if (currentLevel > levelsCount) {
           currentLevel = 0;
-          currentBet = sequenceBaseBet * seq[0];
+          currentBet = sequenceBaseBet;
           cycleLoss = 0;
         } else {
-          currentBet = sequenceBaseBet * seq[levelIdx];
+          const dutchUnit = 1 + levelIdx * 2;
+          currentBet = sequenceBaseBet * dutchUnit;
         }
       } else {
         // Continuous recovery: do not reset level here. 
         // We bet the corresponding amount for the current level until hasRecovered resets us.
         const levelIdx = Math.floor(currentLevel / 3);
-        currentBet = sequenceBaseBet * seq[Math.min(levelIdx, seq.length - 1)];
+        const dutchUnit = 1 + levelIdx * 2;
+        currentBet = sequenceBaseBet * dutchUnit;
       }
       consecutiveWins = 0;
     }
     else if (config.mode === ManagementMode.PADOVAN) {
-      const seq = [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49];
       if (win === false) {
         currentLevel += 1;
-        if (currentLevel >= seq.length || currentLevel > levelsCount) {
+        if (currentLevel > levelsCount) {
           currentLevel = 0;
-          currentBet = sequenceBaseBet * seq[0];
+          currentBet = sequenceBaseBet * padovanSequence[0];
           cycleLoss = 0;
         } else {
-          currentBet = sequenceBaseBet * seq[currentLevel];
+          const padovanUnit = padovanSequence[currentLevel] || padovanSequence[padovanSequence.length - 1];
+          currentBet = sequenceBaseBet * padovanUnit;
         }
       } else {
         // Continuous recovery: do not reset level here.
-        currentBet = sequenceBaseBet * seq[Math.min(currentLevel, seq.length - 1)];
+        const padovanUnit = padovanSequence[Math.min(currentLevel, padovanSequence.length - 1)];
+        currentBet = sequenceBaseBet * padovanUnit;
       }
       consecutiveWins = 0;
     }
@@ -811,7 +822,7 @@ export const getDynamicBetAndState = (
         config.minChip
       );
   let initialBet = Number((initialChip * N).toFixed(2));
-  const levelsCount = Number(config.levels) || 3;
+  const levelsCount = config.levels !== undefined && !isNaN(Number(config.levels)) && Number(config.levels) >= 0 ? Number(config.levels) : 10;
 
   // Include all history items in chronological order (oldest first)
   const chronologicalResults = [...history].reverse();
@@ -822,7 +833,10 @@ export const getDynamicBetAndState = (
   let currentLevel = 0; // level/gale index (0 = base bet, 1 = Gale 1, and so on)
   let sequenceBaseBet = initialBet;
 
-  const fibSequence = generateFibonacciSequence(Math.max(16, levelsCount + 2));
+  const fibSequence = generateFibonacciSequence(Math.max(30, levelsCount + 5));
+  const padovanSequence = generatePadovanSequence(Math.max(30, levelsCount + 5));
+  const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+  const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
   let fibIndex = 0;
   let runningProfit = 0;
   let maxRunningProfit = 0;
@@ -976,11 +990,11 @@ export const getDynamicBetAndState = (
       else if (config.mode === ManagementMode.CYCLIC) {
         const cycle = [1, 2, 4, 8, 16];
         if (win === false) {
-          if (currentLevel > levelsCount || currentLevel >= cycle.length) {
+          if (currentLevel > levelsCount) {
             currentLevel = 0;
             currentBet = initialBet;
           } else {
-            currentBet = sequenceBaseBet * cycle[currentLevel];
+            currentBet = sequenceBaseBet * (cycle[currentLevel % cycle.length] || 1);
           }
         } else {
           currentLevel = 0;
@@ -1135,32 +1149,30 @@ export const getDynamicBetAndState = (
         consecutiveWins = 0;
       }
       else if (config.mode === ManagementMode.STAR_2_2) {
-        const seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12];
         if (win === false) {
           consecutiveWins = 0;
           currentLevel += 1;
-          if (currentLevel >= seq.length || currentLevel > levelsCount) {
+          if (currentLevel > levelsCount) {
             currentLevel = 0;
-            currentBet = sequenceBaseBet * seq[0];
+            currentBet = sequenceBaseBet * star22Seq[0];
             cycleLoss = 0;
           } else {
-            currentBet = sequenceBaseBet * seq[currentLevel];
+            currentBet = sequenceBaseBet * (star22Seq[currentLevel] || star22Seq[star22Seq.length - 1]);
           }
         } else {
           if (consecutiveWins === 0) {
             consecutiveWins = 1;
-            const seqVal = seq[Math.min(currentLevel, seq.length - 1)] || 1;
+            const seqVal = star22Seq[Math.min(currentLevel, star22Seq.length - 1)] || 1;
             currentBet = sequenceBaseBet * Math.max(1, Math.round(seqVal * 1.5));
           } else {
             consecutiveWins = 0;
             currentLevel = 0;
-            currentBet = sequenceBaseBet * seq[0];
+            currentBet = sequenceBaseBet * star22Seq[0];
             cycleLoss = 0;
           }
         }
       }
       else if (config.mode === ManagementMode.STAR_2_0) {
-        const seq = [1, 2, 3, 4, 5, 7, 9, 12];
         const U = sequenceBaseBet;
         
         if (prevLevel === 0) {
@@ -1169,7 +1181,7 @@ export const getDynamicBetAndState = (
             consecutiveWins = 0;
             if (cycleLoss >= 7 * U) {
               currentLevel = 1;
-              currentBet = U * seq[0];
+              currentBet = U * (star20Seq[0] || 1);
             } else {
               currentLevel = 0;
               currentBet = U;
@@ -1191,18 +1203,18 @@ export const getDynamicBetAndState = (
           if (win === false) {
             consecutiveWins = 0;
             currentLevel = prevLevel + 1;
-            if (currentLevel > seq.length || currentLevel > levelsCount) {
+            if (currentLevel > levelsCount) {
               currentLevel = 0;
               currentBet = U;
               cycleLoss = 0;
             } else {
-              currentBet = U * seq[currentLevel - 1];
+              currentBet = U * (star20Seq[currentLevel - 1] || star20Seq[star20Seq.length - 1]);
             }
           } else {
             if (prevConsecutiveWins === 0) {
               consecutiveWins = 1;
               currentLevel = prevLevel;
-              const seqVal = seq[Math.min(prevLevel - 1, seq.length - 1)] || 1;
+              const seqVal = star20Seq[Math.min(prevLevel - 1, star20Seq.length - 1)] || 1;
               currentBet = U * seqVal * 2;
             } else {
               consecutiveWins = 0;
@@ -1214,38 +1226,40 @@ export const getDynamicBetAndState = (
         }
       }
       else if (config.mode === ManagementMode.DUTCH) {
-        const seq = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
         if (win === false) {
           currentLevel += 1;
           const levelIdx = Math.floor(currentLevel / 3);
-          if (levelIdx >= seq.length || levelIdx > levelsCount) {
+          if (currentLevel > levelsCount) {
             currentLevel = 0;
-            currentBet = sequenceBaseBet * seq[0];
+            currentBet = sequenceBaseBet;
             cycleLoss = 0;
           } else {
-            currentBet = sequenceBaseBet * seq[levelIdx];
+            const dutchUnit = 1 + levelIdx * 2;
+            currentBet = sequenceBaseBet * dutchUnit;
           }
         } else {
           // Continuous recovery: do not reset level here.
           const levelIdx = Math.floor(currentLevel / 3);
-          currentBet = sequenceBaseBet * seq[Math.min(levelIdx, seq.length - 1)];
+          const dutchUnit = 1 + levelIdx * 2;
+          currentBet = sequenceBaseBet * dutchUnit;
         }
         consecutiveWins = 0;
       }
       else if (config.mode === ManagementMode.PADOVAN) {
-        const seq = [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49];
         if (win === false) {
           currentLevel += 1;
-          if (currentLevel >= seq.length || currentLevel > levelsCount) {
+          if (currentLevel > levelsCount) {
             currentLevel = 0;
-            currentBet = sequenceBaseBet * seq[0];
+            currentBet = sequenceBaseBet * padovanSequence[0];
             cycleLoss = 0;
           } else {
-            currentBet = sequenceBaseBet * seq[currentLevel];
+            const padovanUnit = padovanSequence[currentLevel] || padovanSequence[padovanSequence.length - 1];
+            currentBet = sequenceBaseBet * padovanUnit;
           }
         } else {
           // Continuous recovery: do not reset level here.
-          currentBet = sequenceBaseBet * seq[Math.min(currentLevel, seq.length - 1)];
+          const padovanUnit = padovanSequence[Math.min(currentLevel, padovanSequence.length - 1)];
+          currentBet = sequenceBaseBet * padovanUnit;
         }
         consecutiveWins = 0;
       }
@@ -1257,7 +1271,7 @@ export const getDynamicBetAndState = (
     const targetProfit = config.targetProfit || 0;
     const stopLoss = config.stopLoss || 0;
     const exceededAllLevels = config.mode !== ManagementMode.NIVEL_FIXO_RECUPERACAO && 
-      (currentLevel > levelsCount || (config.mode === ManagementMode.FIBONACCI && (fibIndex || 0) >= levelsCount));
+      (currentLevel > levelsCount || (config.mode === ManagementMode.FIBONACCI && (fibIndex || 0) > levelsCount));
     const isAtBaseLevel = currentLevel === 0 && fibIndex === 0;
     if ((targetProfit > 0 && runningProfit >= targetProfit) || exceededAllLevels || (isAtBaseLevel && stopLoss > 0 && runningProfit <= -stopLoss)) {
       currentBet = initialBet;
@@ -1391,7 +1405,10 @@ export const calculateStopLossForLossSequence = (
   const multiplier = config.multiplier || 2;
   const N_losses = Math.max(1, lossCount);
 
-  const fibSequence = generateFibonacciSequence(Math.max(20, N_losses + 5));
+  const fibSequence = generateFibonacciSequence(Math.max(30, N_losses + 5));
+  const padovanSequence = generatePadovanSequence(Math.max(30, N_losses + 5));
+  const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+  const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
   let labList = (config.customLabouchereSequence && config.customLabouchereSequence.length > 0)
     ? [...config.customLabouchereSequence]
     : [1, 2, 3];
@@ -1435,23 +1452,20 @@ export const calculateStopLossForLossSequence = (
           units = 1 + 2 * (i - 1);
           break;
         case ManagementMode.STAR_2_2: {
-          const seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12];
-          units = seq[(i - 1) % seq.length] || 1;
+          units = (i - 1) < star22Seq.length ? star22Seq[i - 1] : star22Seq[star22Seq.length - 1];
           break;
         }
         case ManagementMode.STAR_2_0: {
-          const seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12];
-          units = seq[(i - 1) % seq.length] || 1;
+          units = (i - 1) < star20Seq.length ? star20Seq[i - 1] : star20Seq[star20Seq.length - 1];
           break;
         }
         case ManagementMode.DUTCH: {
-          const seq = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
-          units = seq[Math.floor((i - 1) / 3) % seq.length] || 1;
+          const dutchIdx = Math.floor((i - 1) / 3);
+          units = 1 + dutchIdx * 2;
           break;
         }
         case ManagementMode.PADOVAN: {
-          const seq = [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49];
-          units = seq[(i - 1) % seq.length] || 1;
+          units = (i - 1) < padovanSequence.length ? padovanSequence[i - 1] : padovanSequence[padovanSequence.length - 1];
           break;
         }
         case ManagementMode.SOROS:

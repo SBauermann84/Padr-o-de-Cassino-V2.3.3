@@ -10,7 +10,7 @@ import SignalsPanel from './components/SignalsPanel';
 import { ManagementPanel } from './components/ManagementPanel';
 import { analyzeRouletteResult, findMostProbableEntry, checkWin } from './engines/statsEngine';
 import { calculateScore, generateSignal } from './engines/scoreEngine';
-import { getDynamicBetAndState, calculateProportionalCoverage, getInitialProgressionState, updateProgressionState, generateFibonacciSequence, getOverrideChipForSignal, calculatePayoutRatioForEntry, getPositionCountForSignal } from './engines/progressionEngine';
+import { getDynamicBetAndState, calculateProportionalCoverage, getInitialProgressionState, updateProgressionState, generateFibonacciSequence, generatePadovanSequence, getOverrideChipForSignal, calculatePayoutRatioForEntry, getPositionCountForSignal } from './engines/progressionEngine';
 import { learningService } from './services/learningService';
 import { strategyEngine, StrategySignal } from './engines/strategyEngine';
 import { getEnrichedRules } from './lib/rulesEnricher';
@@ -475,7 +475,7 @@ export default function App() {
           // Linear progression: chipSize * (1 + i)
           individualBetSize = chipSize * (1 + i);
         } else if (mode === ManagementMode.FIBONACCI) {
-          const fibSequence = generateFibonacciSequence(Math.max(16, levels + 2));
+          const fibSequence = generateFibonacciSequence(Math.max(30, levels + 5));
           const fibMultiplier = fibSequence[i] || fibSequence[fibSequence.length - 1];
           individualBetSize = chipSize * fibMultiplier;
         } else if (mode === ManagementMode.CYCLIC) {
@@ -488,6 +488,22 @@ export default function App() {
           individualBetSize = chipSize * (1 + 2 * i);
         } else if (mode === ManagementMode.D_ALEMBERT) {
           individualBetSize = chipSize * (i + 1);
+        } else if (mode === ManagementMode.STAR_2_2) {
+          const star22Seq = [1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+          const starMultiplier = i < star22Seq.length ? star22Seq[i] : star22Seq[star22Seq.length - 1];
+          individualBetSize = chipSize * starMultiplier;
+        } else if (mode === ManagementMode.STAR_2_0) {
+          const star20Seq = [1, 1, 1, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 9, 12, 16, 21, 28, 37, 49, 65, 86, 114, 151, 200, 265, 351, 465, 616, 816];
+          const starMultiplier = i < star20Seq.length ? star20Seq[i] : star20Seq[star20Seq.length - 1];
+          individualBetSize = chipSize * starMultiplier;
+        } else if (mode === ManagementMode.DUTCH) {
+          const dutchIdx = Math.floor(i / 3);
+          const dutchMultiplier = 1 + dutchIdx * 2;
+          individualBetSize = chipSize * dutchMultiplier;
+        } else if (mode === ManagementMode.PADOVAN) {
+          const padovanSequence = generatePadovanSequence(Math.max(30, levels + 5));
+          const padovanMultiplier = i < padovanSequence.length ? padovanSequence[i] : padovanSequence[padovanSequence.length - 1];
+          individualBetSize = chipSize * padovanMultiplier;
         } else {
           // Fixed or fallback: constant chip size
           individualBetSize = chipSize;
